@@ -1,10 +1,11 @@
 name: Build APK
 
-# Push-trigger is disabled for now so mid-upload commits (placeholder
-# files, icon fixes, etc.) don't each kick off a build. Trigger manually
-# from the Actions tab when you're actually ready for a fresh APK:
-# Actions -> Build APK -> Run workflow.
+# Builds automatically on every push to main, and can also be triggered
+# manually from the Actions tab (useful if you just want a fresh build
+# without pushing a new change).
 on:
+  push:
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
