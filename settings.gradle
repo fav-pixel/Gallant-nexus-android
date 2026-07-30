@@ -1,1 +1,2 @@
-place holder 
+rootProject.name = "Nexus"
+include ':app'
