@@ -8,7 +8,6 @@ import android.webkit.WebViewClient
 import android.widget.ProgressBar
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
-import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 
 /**
  * A single-WebView shell around the whole ecosystem. Nexus is the home
@@ -24,7 +23,6 @@ class MainActivity : AppCompatActivity() {
     private val homeUrl = "https://gallantnexus-chi.vercel.app/"
 
     private lateinit var webView: WebView
-    private lateinit var swipeRefresh: SwipeRefreshLayout
     private lateinit var progressBar: ProgressBar
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -32,11 +30,9 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         webView = findViewById(R.id.webView)
-        swipeRefresh = findViewById(R.id.swipeRefresh)
         progressBar = findViewById(R.id.progressBar)
 
         setupWebView()
-        setupSwipeRefresh()
         setupBackNavigation()
 
         if (savedInstanceState == null) {
@@ -65,11 +61,6 @@ class MainActivity : AppCompatActivity() {
                 view.loadUrl(request.url.toString())
                 return true
             }
-
-            override fun onPageFinished(view: WebView, url: String?) {
-                super.onPageFinished(view, url)
-                swipeRefresh.isRefreshing = false
-            }
         }
 
         webView.webChromeClient = object : WebChromeClient() {
@@ -81,13 +72,6 @@ class MainActivity : AppCompatActivity() {
                     android.view.View.GONE
                 }
             }
-        }
-    }
-
-    private fun setupSwipeRefresh() {
-        swipeRefresh.setColorSchemeColors(0xFF00C2A8.toInt())
-        swipeRefresh.setOnRefreshListener {
-            webView.reload()
         }
     }
 
