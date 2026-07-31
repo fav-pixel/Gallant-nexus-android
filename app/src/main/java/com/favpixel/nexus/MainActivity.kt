@@ -1,6 +1,7 @@
 package com.favpixel.nexus
 
 import android.os.Bundle
+import android.view.View
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
@@ -24,6 +25,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var webView: WebView
     private lateinit var progressBar: ProgressBar
+    private lateinit var loadingOverlay: View
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -31,6 +33,7 @@ class MainActivity : AppCompatActivity() {
 
         webView = findViewById(R.id.webView)
         progressBar = findViewById(R.id.progressBar)
+        loadingOverlay = findViewById(R.id.loadingOverlay)
 
         setupWebView()
         setupBackNavigation()
@@ -60,6 +63,22 @@ class MainActivity : AppCompatActivity() {
             ): Boolean {
                 view.loadUrl(request.url.toString())
                 return true
+            }
+
+            override fun onPageStarted(view: WebView, url: String?, favicon: android.graphics.Bitmap?) {
+                super.onPageStarted(view, url, favicon)
+                loadingOverlay.animate().cancel()
+                loadingOverlay.alpha = 1f
+                loadingOverlay.visibility = View.VISIBLE
+            }
+
+            override fun onPageFinished(view: WebView, url: String?) {
+                super.onPageFinished(view, url)
+                loadingOverlay.animate()
+                    .alpha(0f)
+                    .setDuration(350)
+                    .withEndAction { loadingOverlay.visibility = View.GONE }
+                    .start()
             }
         }
 
