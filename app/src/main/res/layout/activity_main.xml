@@ -20,4 +20,20 @@
         android:progressTint="#00c2a8"
         android:visibility="gone" />
 
+    <FrameLayout
+        android:id="@+id/loadingOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#0a0e14">
+
+        <ImageView
+            android:id="@+id/loadingLogo"
+            android:layout_width="140dp"
+            android:layout_height="140dp"
+            android:layout_gravity="center"
+            android:src="@drawable/nexus_splash"
+            android:contentDescription="Nexus" />
+
+    </FrameLayout>
+
 </FrameLayout>
