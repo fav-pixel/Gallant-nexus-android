@@ -1,14 +1,21 @@
 package com.favpixel.nexus
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
 import android.view.View
+import android.webkit.PermissionRequest
+import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.ProgressBar
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 
 /**
  * A single-WebView shell around the whole ecosystem. Nexus is the home
@@ -26,6 +33,45 @@ class MainActivity : AppCompatActivity() {
     private lateinit var webView: WebView
     private lateinit var progressBar: ProgressBar
     private lateinit var loadingOverlay: View
+
+    // Holds the pending mic permission request from the WebView while we
+    // ask the user for the native RECORD_AUDIO permission, and the pending
+    // file-chooser callback while the user picks a file (for Yelena's
+    // PDF/Image/Other-files attachment buttons — WebView can't show a file
+    // picker on its own, the host app has to provide one).
+    private var pendingMicRequest: PermissionRequest? = null
+    private var pendingFileCallback: ValueCallback<Array<Uri>>? = null
+
+    private val micPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            val request = pendingMicRequest
+            pendingMicRequest = null
+            if (request == null) return@registerForActivityResult
+            if (granted) {
+                request.grant(request.resources)
+            } else {
+                request.deny()
+            }
+        }
+
+    private val fileChooserLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            val callback = pendingFileCallback
+            pendingFileCallback = null
+            if (callback == null) return@registerForActivityResult
+            val data = result.data
+            val uris = if (result.resultCode == RESULT_OK && data != null) {
+                val clipData = data.clipData
+                if (clipData != null) {
+                    Array(clipData.itemCount) { i -> clipData.getItemAt(i).uri }
+                } else {
+                    data.data?.let { arrayOf(it) } ?: arrayOf()
+                }
+            } else {
+                arrayOf()
+            }
+            callback.onReceiveValue(uris)
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -86,10 +132,55 @@ class MainActivity : AppCompatActivity() {
             override fun onProgressChanged(view: WebView, newProgress: Int) {
                 progressBar.progress = newProgress
                 progressBar.visibility = if (newProgress in 1..99) {
-                    android.view.View.VISIBLE
+                    View.VISIBLE
                 } else {
-                    android.view.View.GONE
+                    View.GONE
                 }
+            }
+
+            // Yelena's Speak mode uses the browser's mic (getUserMedia).
+            // The WebView itself can't grant that — it has to ask the host
+            // app, which asks Android, which asks the person.
+            override fun onPermissionRequest(request: PermissionRequest) {
+                val wantsMic = request.resources.any {
+                    it == PermissionRequest.RESOURCE_AUDIO_CAPTURE
+                }
+                if (!wantsMic) {
+                    request.deny()
+                    return
+                }
+
+                val alreadyGranted = ContextCompat.checkSelfPermission(
+                    this@MainActivity, Manifest.permission.RECORD_AUDIO
+                ) == PackageManager.PERMISSION_GRANTED
+
+                if (alreadyGranted) {
+                    request.grant(request.resources)
+                } else {
+                    pendingMicRequest = request
+                    micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                }
+            }
+
+            // Yelena's PDF/Image/Other-files attachment buttons rely on a
+            // plain <input type="file">, which WebView can't handle without
+            // the host app stepping in to show a real file picker.
+            override fun onShowFileChooser(
+                webView: WebView,
+                filePathCallback: ValueCallback<Array<Uri>>,
+                fileChooserParams: FileChooserParams
+            ): Boolean {
+                pendingFileCallback?.onReceiveValue(null)
+                pendingFileCallback = filePathCallback
+
+                val intent = fileChooserParams.createIntent()
+                try {
+                    fileChooserLauncher.launch(intent)
+                } catch (e: Exception) {
+                    pendingFileCallback = null
+                    return false
+                }
+                return true
             }
         }
     }
