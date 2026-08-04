@@ -42,6 +42,19 @@ class MainActivity : AppCompatActivity() {
     private var pendingMicRequest: PermissionRequest? = null
     private var pendingFileCallback: ValueCallback<Array<Uri>>? = null
 
+    // Holds the pending action to run once legacy storage permission is
+    // granted (only asked for on Android 9 and below — see
+    // AndroidDownloader.kt, which is what actually calls
+    // withStoragePermission below).
+    private var pendingStorageAction: (() -> Unit)? = null
+
+    private val storagePermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            val action = pendingStorageAction
+            pendingStorageAction = null
+            if (granted) action?.invoke()
+        }
+
     private val micPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             val request = pendingMicRequest
@@ -99,6 +112,13 @@ class MainActivity : AppCompatActivity() {
             cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
             mediaPlaybackRequiresUserGesture = false
         }
+
+        // Exposes window.AndroidDownloader to every page this WebView loads
+        // (Nexus, NeuroArchive, Question Studio, Yelena — same shared
+        // WebView). Only Yelena's client code actually calls it; see
+        // AndroidDownloader.kt for why this exists instead of a plain
+        // DownloadListener.
+        webView.addJavascriptInterface(AndroidDownloader(this), "AndroidDownloader")
 
         webView.webViewClient = object : WebViewClient() {
             // Every link — including ones written as target="_blank" — stays
@@ -182,6 +202,22 @@ class MainActivity : AppCompatActivity() {
                 }
                 return true
             }
+        }
+    }
+
+    // Called by AndroidDownloader on Android 9 and below only — API 29+
+    // writes via MediaStore instead, which needs no permission at all.
+    // Already guaranteed to run on the UI thread by the caller.
+    fun withStoragePermission(action: () -> Unit) {
+        val granted = ContextCompat.checkSelfPermission(
+            this, Manifest.permission.WRITE_EXTERNAL_STORAGE
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (granted) {
+            action()
+        } else {
+            pendingStorageAction = action
+            storagePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
         }
     }
 
