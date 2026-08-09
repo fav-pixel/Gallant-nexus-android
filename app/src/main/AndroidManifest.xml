@@ -4,6 +4,12 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Android 13+ (API 33) requires this to be requested at runtime,
+         same as RECORD_AUDIO already is below — see MainActivity's
+         notificationPermissionLauncher. Below API 33, this permission is
+         granted automatically at install time; the runtime request is a
+         harmless no-op there. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Only asked for on Android 9 (API 28) and below — saving to the
          public Downloads folder needs no permission on Android 10+
          (scoped storage / MediaStore). See AndroidDownloader.kt. -->
