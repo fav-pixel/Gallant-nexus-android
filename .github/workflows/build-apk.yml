@@ -14,6 +14,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Piper's voice MODEL is too large for a normal browser file upload
+      # (GitHub's repo-upload limit is 25MB; the model is ~65MB) — so only
+      # voice.onnx lives as a GitHub Release asset and gets pulled down
+      # here, right before the build. voice.onnx.json is small (a few KB
+      # of settings) and is committed directly in the repo as normal —
+      # nothing to fetch for that one.
+      - name: Download Piper voice model
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p app/src/main/assets/piper
+          gh release download piper-voice --repo ${{ github.repository }} \
+            --pattern "voice.onnx" \
+            --dir app/src/main/assets/piper --clobber
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
