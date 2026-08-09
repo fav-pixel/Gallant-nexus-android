@@ -67,6 +67,15 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+    // Asked once on first launch (Android 13+ only — see manifest comment).
+    // Nothing currently depends on the result: this just gets the
+    // permission in place ahead of time so future work (a local
+    // notification bridge, or eventually FCM push for Sovereign/Unchained
+    // proactively reaching out) doesn't also need to solve "how do we ask
+    // for this" from scratch.
+    private val notificationPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* no-op */ }
+
     private val fileChooserLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             val callback = pendingFileCallback
@@ -96,9 +105,20 @@ class MainActivity : AppCompatActivity() {
 
         setupWebView()
         setupBackNavigation()
+        requestNotificationPermissionIfNeeded()
 
         if (savedInstanceState == null) {
             webView.loadUrl(homeUrl)
+        }
+    }
+
+    private fun requestNotificationPermissionIfNeeded() {
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.TIRAMISU) return
+        val alreadyGranted = ContextCompat.checkSelfPermission(
+            this, Manifest.permission.POST_NOTIFICATIONS
+        ) == PackageManager.PERMISSION_GRANTED
+        if (!alreadyGranted) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
 
@@ -119,6 +139,9 @@ class MainActivity : AppCompatActivity() {
         // AndroidDownloader.kt for why this exists instead of a plain
         // DownloadListener.
         webView.addJavascriptInterface(AndroidDownloader(this), "AndroidDownloader")
+        // Exposes window.AndroidNotifications.notify(title, body) — see
+        // AndroidNotifications.kt for what this can and can't do yet.
+        webView.addJavascriptInterface(AndroidNotifications(this), "AndroidNotifications")
 
         webView.webViewClient = object : WebViewClient() {
             // Every link — including ones written as target="_blank" — stays
