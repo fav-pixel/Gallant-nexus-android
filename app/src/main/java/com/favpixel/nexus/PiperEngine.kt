@@ -29,18 +29,16 @@ import java.nio.LongBuffer
  * phonemizer approach, and it's a materially different question from
  * "does the audio sound right."
  *
- * REQUIRED BEFORE THIS COMPILES/RUNS — model files aren't included in this
- * change; .onnx files are tens of MB, too large to hand-write. Download a
- * voice from Hugging Face (huggingface.co/rhasspy/piper-voices) and place
- * both files at:
- *   app/src/main/assets/piper/voice.onnx
- *   app/src/main/assets/piper/voice.onnx.json
- * Start with en_US-lessac-low (~20MB) rather than -medium (~63MB) or
- * -high — GitHub's mobile web upload has roughly a 25MB per-file limit,
- * so -medium/-high likely can't even be uploaded the way everything else
- * in this project has been. Swap to a higher-quality voice later, once
- * this is confirmed working end to end and file transfer needs a
- * different approach anyway.
+ * REQUIRED BEFORE THIS COMPILES/RUNS — the actual model files aren't part
+ * of this repo's regular history; the downloaded .onnx file turned out to
+ * be ~65MB, well over GitHub's 25MB browser-upload limit. Instead they're
+ * attached to a GitHub Release tagged "piper-voice" (asset names
+ * voice.onnx / voice.onnx.json), and the CI workflow
+ * (.github/workflows/build-apk.yml) downloads them into
+ *   app/src/main/assets/piper/
+ * right before every build — see that workflow file for the exact step.
+ * Nothing to place by hand in the repo itself; creating that one release
+ * with those two files attached is the only manual step required.
  */
 class PiperEngine(private val context: Context) {
 
@@ -62,6 +60,11 @@ class PiperEngine(private val context: Context) {
 
         val modelBytes = context.assets.open("piper/voice.onnx").use { it.readBytes() }
         session = env.createSession(modelBytes)
+        // If input names ever turn out to be wrong (see the comment on
+        // synthesizeTestTone below), this line is what would reveal the
+        // real ones — visible with any logcat reader, filtering for tag
+        // "PiperEngine".
+        android.util.Log.d("PiperEngine", "Model input names: ${session?.inputNames}")
 
         val configJson = context.assets.open("piper/voice.onnx.json")
             .bufferedReader().use { it.readText() }
@@ -131,7 +134,10 @@ class PiperEngine(private val context: Context) {
     }
 
     fun playTestTone() {
-        val pcm = synthesizeTestTone()
+        playPcm(synthesizeTestTone())
+    }
+
+    fun playPcm(pcm: ShortArray) {
         val bufferSize = AudioTrack.getMinBufferSize(
             sampleRate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT
         )
