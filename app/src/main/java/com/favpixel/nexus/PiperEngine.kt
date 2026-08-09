@@ -58,12 +58,34 @@ class PiperEngine(private val context: Context) {
     fun loadIfNeeded() {
         if (session != null) return
 
-        val modelBytes = context.assets.open("piper/voice.onnx").use { it.readBytes() }
-        session = env.createSession(modelBytes)
-        // If input names ever turn out to be wrong (see the comment on
-        // synthesizeTestTone below), this line is what would reveal the
-        // real ones — visible with any logcat reader, filtering for tag
-        // "PiperEngine".
+        // Copy the model out of the compressed APK assets into the app's
+        // own storage, a small chunk at a time — 64KB per read, not the
+        // whole 65MB in one block. This is the actual fix for the crash:
+        // the old version read the entire file into one big in-memory
+        // block AND THEN handed that block to the engine, which made its
+        // own separate copy to run it — briefly needing roughly two full
+        // copies of the model in memory at once. Loading from a file path
+        // instead avoids that second copy entirely. Only runs once; later
+        // launches find the file already there and skip straight to
+        // loading it.
+        val modelFile = java.io.File(context.filesDir, "piper_voice.onnx")
+        if (!modelFile.exists()) {
+            android.util.Log.d("PiperEngine", "Copying model to local storage, a bit at a time…")
+            context.assets.open("piper/voice.onnx").use { input ->
+                modelFile.outputStream().use { output ->
+                    val buffer = ByteArray(64 * 1024)
+                    var bytesRead: Int
+                    while (input.read(buffer).also { bytesRead = it } != -1) {
+                        output.write(buffer, 0, bytesRead)
+                    }
+                }
+            }
+        }
+
+        // Loading by file path (not a byte array) lets the native engine
+        // read the file itself rather than requiring the whole thing
+        // already sitting in Java's memory beforehand.
+        session = env.createSession(modelFile.absolutePath, OrtSession.SessionOptions())
         android.util.Log.d("PiperEngine", "Model input names: ${session?.inputNames}")
 
         val configJson = context.assets.open("piper/voice.onnx.json")

@@ -29,7 +29,7 @@ class AndroidPiperTest(private val activity: MainActivity) {
     fun run() {
         val engine = PiperEngine(activity)
 
-        toast("Piper: loading model…")
+        toast("Piper: preparing model (first run only, copies it to storage)…")
         try {
             engine.loadIfNeeded()
         } catch (e: Exception) {
