@@ -142,9 +142,6 @@ class MainActivity : AppCompatActivity() {
         // Exposes window.AndroidNotifications.notify(title, body) — see
         // AndroidNotifications.kt for what this can and can't do yet.
         webView.addJavascriptInterface(AndroidNotifications(this), "AndroidNotifications")
-        // Test-only for now — window.AndroidPiperTest.run() from any page.
-        // See AndroidPiperTest.kt / PiperEngine.kt for what this proves.
-        webView.addJavascriptInterface(AndroidPiperTest(this), "AndroidPiperTest")
 
         webView.webViewClient = object : WebViewClient() {
             // Every link — including ones written as target="_blank" — stays
