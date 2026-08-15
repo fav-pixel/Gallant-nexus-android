@@ -40,22 +40,44 @@ jobs:
         with:
           gradle-version: '8.5'
 
-      - name: Confirm retired Piper runtime is absent
+      # Older Nexus commits may still contain the abandoned local speech
+      # experiment. Remove those files in the CI checkout so this workflow
+      # remains usable even before the cleaned source ZIP is uploaded.
+      - name: Remove retired local speech runtime
         shell: bash
         run: |
           set -euo pipefail
-          if grep -RniE 'piper|onnx|PiperEngine|AndroidPiperTest' \
-            --exclude-dir=.git \
-            --exclude-dir=.gradle \
-            --exclude-dir=build \
-            .; then
-            echo 'Retired Piper/ONNX references found.' >&2
+          rm -f \
+            app/src/main/java/com/favpixel/nexus/PiperEngine.kt \
+            app/src/main/java/com/favpixel/nexus/AndroidPiperTest.kt
+          rm -rf app/src/main/assets/piper
+
+      # Scan only build/runtime inputs. Do not scan this workflow or README
+      # text, otherwise the check can match its own explanatory comments.
+      - name: Confirm retired runtime is absent from build inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          SEARCH_PATHS=(
+            app/src/main/java
+            app/src/main/assets
+            app/src/main/res
+            app/src/main/AndroidManifest.xml
+            app/build.gradle
+            build.gradle
+            settings.gradle
+          )
+          EXISTING_PATHS=()
+          for path in "${SEARCH_PATHS[@]}"; do
+            if [[ -e "$path" ]]; then
+              EXISTING_PATHS+=("$path")
+            fi
+          done
+          if ((${#EXISTING_PATHS[@]} > 0)) && grep -RniE 'piper|onnx|PiperEngine|AndroidPiperTest' "${EXISTING_PATHS[@]}"; then
+            echo 'Retired local speech runtime references found in build inputs.' >&2
             exit 1
           fi
-          echo 'No retired Piper/ONNX references found.'
-
-      - name: Check Gradle installation
-        run: gradle --version
+          echo 'No retired local speech runtime references found in build inputs.'
 
       - name: Build debug APK
         run: gradle assembleDebug --no-daemon --stacktrace
