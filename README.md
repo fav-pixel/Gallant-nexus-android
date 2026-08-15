@@ -1,320 +1,122 @@
-# 🚀 Gallant Nexus Android
+# Gallant Nexus Android
 
-A cutting-edge Android application that brings the Gallant ecosystem to your mobile device. Built with Kotlin and featuring advanced voice synthesis capabilities using Piper ONNX models.
+A lightweight Android host shell for the Gallant ecosystem. The application is built with Kotlin and WebView, with a small native bridge for permissions, downloads, notifications, and file selection.
 
-## ✨ Features
+## Features
 
-- **Voice Synthesis** - Piper ONNX-based voice synthesis with multiple voice options
-- **Ecosystem Integration** - Direct connection to the Gallant ecosystem
-- **Native Performance** - Built entirely in Kotlin for optimal speed
-- **Modern UI** - Material Design 3 compliant interface
-- **Offline Capable** - Download voices for offline use
-- **Multi-Voice Support** - Choose from various voice personalities
-- **Fast Inference** - Optimized ONNX runtime for smooth speech
-- **User-Friendly** - Intuitive navigation and controls
+- Direct connection to the Gallant ecosystem.
+- Responsive ecosystem UI inside a native Android WebView host.
+- Native microphone permission handoff for browser-based voice input.
+- Native file picker support for PDF, image, code, and other attachments.
+- Download handling through Android storage APIs.
+- Android notification integration.
+- Triskelion-inspired NEXUS loading identity.
+- Lightweight runtime with no bundled speech engine or voice model.
 
-## 🏗️ Tech Stack
+## Tech stack
 
 - **Language:** Kotlin
-- **Platform:** Android (API 21+)
-- **Build System:** Gradle
-- **CI/CD:** GitHub Actions (build-apk.yml)
-- **Voice Engine:** Piper ONNX Models
-- **Runtime:** ONNX Runtime for Android
-- **Architecture:** MVVM (recommended)
+- **Platform:** Android, minimum SDK 24, target SDK 34
+- **Build system:** Gradle
+- **Host surface:** Android WebView
+- **Native bridge:** Kotlin permission, file, download, and notification handlers
+- **CI/CD:** GitHub Actions workflow, when configured in the repository
+- **Architecture:** Lightweight host shell
 
-## 📋 System Requirements
+## System requirements
 
-- **Minimum SDK:** Android 5.0 (API 21)
-- **Target SDK:** Android 14+ (API 34+)
-- **RAM:** 2GB minimum (4GB+ recommended)
-- **Storage:** 500MB+ for app + voice models
-- **Processor:** ARM or x86
+- Android Studio 2023.1 or newer.
+- Android SDK 34.
+- Kotlin 1.8 or newer.
+- Gradle 8.0 or newer.
+- Android device or emulator running API 24 or newer.
+- Approximately 100 MB of free storage for the host application, excluding WebView cache.
 
-## 🎤 Voice Models
-
-This project uses **Piper** - a high-quality, on-device text-to-speech engine.
-
-### Available Voice Models
-- Multiple voices with different personalities
-- Stored in `app/src/main/assets/piper/`
-- Download from [Release Pages](https://github.com/fav-pixel/Gallant-nexus-android/releases)
-- Each model: ~65MB
-- Supports multiple languages
-
-## 🚀 Quick Start
-
-### Prerequisites
-- Android Studio (2023.1+)
-- Android SDK 21+
-- Kotlin 1.8+
-- Gradle 8.0+
-- Git
-
-### Installation
+## Quick start
 
 ```bash
-# Clone the repository
 git clone https://github.com/fav-pixel/Gallant-nexus-android.git
-
-# Navigate to directory
 cd Gallant-nexus-android
-
-# Open in Android Studio
-# File → Open → Select this directory
 ```
 
-### Setting Up Voice Files
+Open the project in Android Studio, allow Gradle synchronization to complete, and run the `app` configuration on an Android device or emulator.
 
-1. **Download voice models** from [Releases](https://github.com/fav-pixel/Gallant-nexus-android/releases)
-2. **Create directory:**
-   ```bash
-   mkdir -p app/src/main/assets/piper/
-   ```
-3. **Place voice files** in `app/src/main/assets/piper/`
-4. **Verify structure:**
-   ```
-   app/src/main/assets/piper/
-   ├── voice.onnx
-   └── voice_config.json
-   ```
-
-### Building
+## Building
 
 ```bash
 # Debug APK
 ./gradlew assembleDebug
 
-# Release APK (requires signing)
+# Release APK; signing configuration is required for distribution
 ./gradlew assembleRelease
 
-# Install on device
+# Install the debug APK on a connected device
 ./gradlew installDebug
 ```
 
-### Running on Emulator/Device
+The archive supplied for this source snapshot does not include a Gradle wrapper. If `./gradlew` is unavailable, open the project in Android Studio or run the build with a locally installed Gradle 8.x distribution.
 
-```bash
-# Run directly
-./gradlew run
+## Project structure
 
-# Or use Android Studio
-# Device → Select device → Run
-```
-
-## 📁 Project Structure
-
-```
+```text
 Gallant-nexus-android/
 ├── app/
-│   ├── src/
-│   │   ├── main/
-│   │   │   ├── java/
-│   │   │   │   └── com/gallant/nexus/
-│   │   │   │       ├── MainActivity.kt
-│   │   │   │       ├── ui/
-│   │   │   │       ├── viewmodel/
-│   │   │   │       └── repository/
-│   │   │   ├── res/
-│   │   │   │   ├── layout/
-│   │   │   │   ├── drawable/
-│   │   │   │   └── values/
-│   │   │   └── assets/
-│   │   │       └── piper/        # Voice models
-│   │   ├── test/
-│   │   └── androidTest/
-│   ├── build.gradle.kts
-│   └── proguard-rules.pro
-├── .github/
-│   └── workflows/
-│       └── build-apk.yml         # Automated APK building
-├── gradle/
-├── build.gradle.kts
-├── settings.gradle.kts
+│   └── src/main/
+│       ├── java/com/favpixel/nexus/
+│       │   ├── MainActivity.kt
+│       │   ├── AndroidDownloader.kt
+│       │   └── AndroidNotifications.kt
+│       ├── res/
+│       │   ├── drawable/
+│       │   ├── layout/
+│       │   └── values/
+│       └── assets/                 # Lightweight app assets only
+├── build.gradle
+├── settings.gradle
 └── README.md
 ```
 
-## 🎮 Core Components
+## Native host bridge
 
-### MainActivity
-- App entry point
-- Handles initialization
-- Manages navigation
+`MainActivity` owns the WebView lifecycle and loading overlay. It also provides the Android-specific capabilities that a WebView cannot perform alone:
 
-### Voice Engine
-- Piper ONNX initialization
-- Model loading
-- Text-to-speech conversion
-- Audio output handling
+- Microphone permission requests for browser `getUserMedia` flows.
+- File chooser integration for `<input type="file">`.
+- Download routing through Android storage APIs.
+- Native notification requests.
+- Back-navigation handling and WebView state restoration.
 
-### UI Screens
-- Home screen
-- Voice selection
-- Text input
-- Playback controls
-- Settings
+The WebView remains responsible for the ecosystem application surface. No local speech runtime, voice model, or text-to-speech engine is bundled in this package.
 
-### Data Layer
-- Local storage (preferences)
-- Model management
-- Cache handling
+## Triskelion loading identity
 
-## 🔄 CI/CD Pipeline
+The Android loading overlay uses `app/src/main/res/drawable/nexus_splash.png`, a compact Triskelion-inspired NEXUS mark with a central gateway core and three radial routes. It is intentionally kept as a small local drawable so the loading state works without a network request.
 
-### GitHub Actions Workflow
-Located in `.github/workflows/build-apk.yml`:
+## Testing
 
-```yaml
-- Triggers on: push, pull_request
-- Runs: Gradle build
-- Produces: Debug & Release APKs
-- Artifacts: Available for download
-```
+Use Android Studio or Gradle to run unit and instrumented tests when those test targets are present:
 
-### Building via Actions
-1. Push to repository
-2. GitHub Actions automatically builds
-3. APKs available in workflow artifacts
-4. Download and test on devices
-
-## 🎤 Piper Integration Guide
-
-### Initialize Piper
-```kotlin
-val piperEngine = PiperEngine(context)
-piperEngine.initialize("path/to/model.onnx")
-```
-
-### Synthesize Speech
-```kotlin
-val audio = piperEngine.synthesize("Hello, world!")
-audioPlayer.play(audio)
-```
-
-### Load Custom Voice
-```kotlin
-piperEngine.loadVoice(
-    modelPath = "assets/piper/custom_voice.onnx",
-    configPath = "assets/piper/custom_voice_config.json"
-)
-```
-
-## 📊 Performance Optimization
-
-### Memory Management
-- Stream audio instead of loading all
-- Lazy load voice models
-- Cache frequently used voices
-
-### Battery Optimization
-- Use efficient ONNX operations
-- Minimize audio processing
-- Background task management
-
-### File Size
-- Modular voice models (download on demand)
-- ProGuard obfuscation and shrinking
-- Asset compression
-
-## 🧪 Testing
-
-### Unit Tests
 ```bash
 ./gradlew test
-```
-
-### Instrumented Tests
-```bash
 ./gradlew connectedAndroidTest
 ```
 
-### Manual Testing
-- Test on multiple Android versions
-- Test with different voice models
-- Test offline functionality
-- Test memory usage
+Manual verification should cover WebView loading, the Triskelion loading overlay, back navigation, microphone permission flow, file selection, downloads, and notifications on a physical device or emulator.
 
-## 🔐 Security
+## Security notes
 
-- Sensitive data in encrypted shared preferences
-- API key management via BuildConfig
-- ProGuard code obfuscation
-- Secure asset loading
+The native bridge should expose only the capabilities required by the hosted application. Permission requests must be granted only after checking the requested resource, file callbacks must be cleared on cancellation, and sensitive credentials must remain in the hosted application's secure configuration rather than in Android resources.
 
-## 📦 Dependencies
+## Contributing
 
-Key libraries (see `build.gradle.kts`):
-- Kotlin Coroutines
-- Android Jetpack (ViewModel, LiveData)
-- Material Design 3
-- ONNX Runtime
-- Audio framework
+Keep Kotlin files focused, document native bridge changes, test on the minimum supported API level, and avoid adding large bundled runtimes to the host shell unless the feature requires them and their device cost has been evaluated.
 
-## 🤝 Contributing
-
-Contributions welcome! Please:
-1. Fork the repository
-2. Create a feature branch
-3. Make meaningful commits
-4. Add tests for new features
-5. Submit a Pull Request
-
-### Code Style
-- Follow Kotlin conventions
-- Use proper naming
-- Add documentation
-- Keep files focused
-
-## 📝 License
+## License and author
 
 This project is part of the Gallant ecosystem.
 
-## 👤 Author
+**Author:** [fav-pixel](https://github.com/fav-pixel)
 
-**fav-pixel** - [GitHub Profile](https://github.com/fav-pixel)
+**Repository:** [Gallant-nexus-android](https://github.com/fav-pixel/Gallant-nexus-android)
 
-## 📞 Support & Issues
-
-For bugs, features, or questions:
-- [GitHub Issues](https://github.com/fav-pixel/Gallant-nexus-android/issues)
-- Check existing issues first
-- Provide device/Android version info
-- Include error logs
-
-## 🚀 Roadmap
-
-- [ ] Multi-language support
-- [ ] Voice cloning capabilities
-- [ ] Real-time speech recognition
-- [ ] Audio effects
-- [ ] Cloud sync
-- [ ] Widget support
-- [ ] Accessibility features
-- [ ] Performance dashboard
-
-## 💡 Tips & Tricks
-
-### First Run
-1. App downloads voice model on first launch
-2. ~2 minutes for initial setup
-3. Subsequent uses are instant
-4. Works offline after download
-
-### Battery Saving
-- Use shorter texts
-- Disable auto-play
-- Close app when done
-- Clear cache periodically
-
-### Better Voice Quality
-- Adjust speech rate in settings
-- Use appropriate voices for content
-- Test different models
-- Check audio output quality
-
----
-
-**Last Updated:** August 2026
-**Status:** Active Development 🚀
-**Platform:** Android 5.0+
-**Latest Release:** [View Releases](https://github.com/fav-pixel/Gallant-nexus-android/releases)
+**Last updated:** August 2026
