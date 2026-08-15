@@ -32,7 +32,7 @@
             android:layout_height="140dp"
             android:layout_gravity="center"
             android:src="@drawable/nexus_splash"
-            android:contentDescription="Nexus" />
+            android:contentDescription="@string/nexus_mark_description" />
 
     </FrameLayout>
 
