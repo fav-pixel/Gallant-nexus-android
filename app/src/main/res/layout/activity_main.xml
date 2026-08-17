@@ -21,23 +21,6 @@
         android:progressTint="#31D7FF"
         android:visibility="gone" />
 
-    <TextView
-        android:id="@+id/codeRedButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="top|end"
-        android:layout_marginTop="18dp"
-        android:layout_marginEnd="18dp"
-        android:background="@drawable/code_red_pill"
-        android:clickable="true"
-        android:focusable="true"
-        android:fontFamily="monospace"
-        android:letterSpacing="0.08"
-        android:text="CODE RED"
-        android:textColor="#FFB8BB"
-        android:textSize="10sp"
-        android:visibility="gone" />
-
     <FrameLayout
         android:id="@+id/loadingOverlay"
         android:layout_width="match_parent"
