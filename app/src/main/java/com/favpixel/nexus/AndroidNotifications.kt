@@ -40,11 +40,26 @@ import androidx.core.content.ContextCompat
 class AndroidNotifications(private val context: Context) {
 
     companion object {
-        private const val CHANNEL_ID = "yelena_general"
+        private const val CHANNEL_ID = "nexus_general"
+        private const val CODE_RED_CHANNEL_ID = "nexus_code_red"
     }
 
     @JavascriptInterface
     fun notify(title: String, body: String) {
+        postNotification(CHANNEL_ID, title, body, NotificationCompat.PRIORITY_DEFAULT)
+    }
+
+    /**
+     * Displays an emergency notification only after a trusted AEGIS page has
+     * already completed its server-side administrator check. This method does
+     * not authenticate, open CODE RED, or expose incident evidence.
+     */
+    @JavascriptInterface
+    fun notifyCodeRed(title: String, body: String) {
+        postNotification(CODE_RED_CHANNEL_ID, title, body, NotificationCompat.PRIORITY_HIGH)
+    }
+
+    private fun postNotification(channelId: String, title: String, body: String, priority: Int) {
         val granted = ContextCompat.checkSelfPermission(
             context, android.Manifest.permission.POST_NOTIFICATIONS
         ) == android.content.pm.PackageManager.PERMISSION_GRANTED
@@ -54,7 +69,7 @@ class AndroidNotifications(private val context: Context) {
         // real and MainActivity actually requests it on launch.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !granted) return
 
-        ensureChannel()
+        ensureChannel(channelId)
 
         val openIntent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -64,14 +79,14 @@ class AndroidNotifications(private val context: Context) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+        val notification = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setPriority(priority)
             .build()
 
         NotificationManagerCompat.from(context).notify(System.currentTimeMillis().toInt(), notification)
@@ -81,17 +96,22 @@ class AndroidNotifications(private val context: Context) {
     // notification can show at all — created lazily on first use rather
     // than in an Application subclass, since this app doesn't have one yet
     // and one channel is all that's needed so far.
-    private fun ensureChannel() {
+    private fun ensureChannel(channelId: String) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = context.getSystemService(NotificationManager::class.java)
-        if (manager.getNotificationChannel(CHANNEL_ID) != null) return
+        if (manager.getNotificationChannel(channelId) != null) return
 
+        val isCodeRed = channelId == CODE_RED_CHANNEL_ID
         val channel = NotificationChannel(
-            CHANNEL_ID,
-            "Yelena",
-            NotificationManager.IMPORTANCE_DEFAULT
+            channelId,
+            if (isCodeRed) "Nexus CODE RED" else "Nexus ecosystem",
+            if (isCodeRed) NotificationManager.IMPORTANCE_HIGH else NotificationManager.IMPORTANCE_DEFAULT
         ).apply {
-            description = "Messages and updates from Yelena"
+            description = if (isCodeRed) {
+                "Administrator-approved emergency status from AEGIS"
+            } else {
+                "Messages and updates from the Nexus ecosystem"
+            }
         }
         manager.createNotificationChannel(channel)
     }

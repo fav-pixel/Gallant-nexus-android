@@ -1,9 +1,11 @@
 package com.favpixel.nexus
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
+import android.speech.RecognizerIntent
 import android.view.View
 import android.webkit.PermissionRequest
 import android.webkit.ValueCallback
@@ -12,6 +14,9 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.ProgressBar
+import android.widget.TextView
+import org.json.JSONObject
+import java.util.Locale
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -27,12 +32,18 @@ import androidx.core.content.ContextCompat
  */
 class MainActivity : AppCompatActivity() {
 
-    // Change this if you ever move Nexus to a different URL.
+    // Change these only when the deployed ecosystem endpoints move.
     private val homeUrl = "https://gallantnexus-chi.vercel.app/"
+    // This only opens the AEGIS console. The AEGIS server still verifies the
+    // authenticated admin profile before any CODE RED action is permitted.
+    private val aegisUrl = "https://yelena.onrender.com/?section=console&source=nexus&mode=code-red"
 
     private lateinit var webView: WebView
     private lateinit var progressBar: ProgressBar
     private lateinit var loadingOverlay: View
+    private lateinit var codeRedButton: TextView
+
+    private var pendingSpeechRequest = false
 
     // Holds the pending mic permission request from the WebView while we
     // ask the user for the native RECORD_AUDIO permission, and the pending
@@ -76,6 +87,19 @@ class MainActivity : AppCompatActivity() {
     private val notificationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* no-op */ }
 
+    private val speechLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            pendingSpeechRequest = false
+            val results = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+            val transcript = results?.firstOrNull()
+            val script = if (result.resultCode == RESULT_OK && !transcript.isNullOrBlank()) {
+                "window.NexusSpeech && window.NexusSpeech.onResult(${JSONObject.quote(transcript)});"
+            } else {
+                "window.NexusSpeech && window.NexusSpeech.onError('speech_unavailable');"
+            }
+            webView.evaluateJavascript(script, null)
+        }
+
     private val fileChooserLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             val callback = pendingFileCallback
@@ -102,6 +126,8 @@ class MainActivity : AppCompatActivity() {
         webView = findViewById(R.id.webView)
         progressBar = findViewById(R.id.progressBar)
         loadingOverlay = findViewById(R.id.loadingOverlay)
+        codeRedButton = findViewById(R.id.codeRedButton)
+        codeRedButton.setOnClickListener { openAegisCodeRed() }
 
         setupWebView()
         setupBackNavigation()
@@ -142,6 +168,8 @@ class MainActivity : AppCompatActivity() {
         // Exposes window.AndroidNotifications.notify(title, body) — see
         // AndroidNotifications.kt for what this can and can't do yet.
         webView.addJavascriptInterface(AndroidNotifications(this), "AndroidNotifications")
+        webView.addJavascriptInterface(AndroidCodeRed(this), "AndroidCodeRed")
+        webView.addJavascriptInterface(AndroidSpeech(this), "AndroidSpeech")
 
         webView.webViewClient = object : WebViewClient() {
             // Every link — including ones written as target="_blank" — stays
@@ -159,14 +187,19 @@ class MainActivity : AppCompatActivity() {
                 loadingOverlay.animate().cancel()
                 loadingOverlay.alpha = 1f
                 loadingOverlay.visibility = View.VISIBLE
+                view.animate().alpha(0.94f).setDuration(120).start()
             }
 
             override fun onPageFinished(view: WebView, url: String?) {
                 super.onPageFinished(view, url)
+                view.animate().alpha(1f).setDuration(260).start()
                 loadingOverlay.animate()
                     .alpha(0f)
                     .setDuration(350)
-                    .withEndAction { loadingOverlay.visibility = View.GONE }
+                    .withEndAction {
+                        loadingOverlay.visibility = View.GONE
+                        codeRedButton.visibility = View.VISIBLE
+                    }
                     .start()
             }
         }
@@ -225,6 +258,34 @@ class MainActivity : AppCompatActivity() {
                 }
                 return true
             }
+        }
+    }
+
+    /**
+     * Opens the server-gated AEGIS console. Nexus never decides whether the
+     * user is an administrator; the AEGIS server performs that check.
+     */
+    fun openAegisCodeRed() {
+        webView.loadUrl(aegisUrl)
+    }
+
+    /** Starts the device speech recognizer for hands-free text entry. */
+    fun startSpeechRecognition() {
+        if (pendingSpeechRequest) return
+        pendingSpeechRequest = true
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
+            putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak a Nexus command")
+        }
+        try {
+            speechLauncher.launch(intent)
+        } catch (_: Exception) {
+            pendingSpeechRequest = false
+            webView.evaluateJavascript(
+                "window.NexusSpeech && window.NexusSpeech.onError('speech_unavailable');",
+                null
+            )
         }
     }
 
