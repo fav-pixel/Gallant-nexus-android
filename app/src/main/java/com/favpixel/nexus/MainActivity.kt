@@ -5,7 +5,9 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
+import android.os.SystemClock
 import android.speech.RecognizerIntent
+import android.view.MotionEvent
 import android.view.View
 import android.webkit.PermissionRequest
 import android.webkit.ValueCallback
@@ -14,7 +16,6 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.ProgressBar
-import android.widget.TextView
 import org.json.JSONObject
 import java.util.Locale
 import androidx.activity.OnBackPressedCallback
@@ -41,9 +42,17 @@ class MainActivity : AppCompatActivity() {
     private lateinit var webView: WebView
     private lateinit var progressBar: ProgressBar
     private lateinit var loadingOverlay: View
-    private lateinit var codeRedButton: TextView
 
     private var pendingSpeechRequest = false
+
+    // Concealed CODE RED fallback for the native WebView host. The ecosystem
+    // header also owns the four-tap gesture in its own page, but this native
+    // listener keeps the APK gesture reliable when a cached/older web surface
+    // is loaded. It only watches the invisible top-left app-mark zone and
+    // never displays an emergency control.
+    private var codeRedTapCount = 0
+    private var codeRedLastTapAt = 0L
+    private var codeRedHandoffInProgress = false
 
     // Holds the pending mic permission request from the WebView while we
     // ask the user for the native RECORD_AUDIO permission, and the pending
@@ -126,10 +135,8 @@ class MainActivity : AppCompatActivity() {
         webView = findViewById(R.id.webView)
         progressBar = findViewById(R.id.progressBar)
         loadingOverlay = findViewById(R.id.loadingOverlay)
-        codeRedButton = findViewById(R.id.codeRedButton)
-        codeRedButton.setOnClickListener { openAegisCodeRed() }
-
         setupWebView()
+        installConcealedCodeRedGesture()
         setupBackNavigation()
         requestNotificationPermissionIfNeeded()
 
@@ -184,6 +191,7 @@ class MainActivity : AppCompatActivity() {
 
             override fun onPageStarted(view: WebView, url: String?, favicon: android.graphics.Bitmap?) {
                 super.onPageStarted(view, url, favicon)
+                codeRedHandoffInProgress = false
                 loadingOverlay.animate().cancel()
                 loadingOverlay.alpha = 1f
                 loadingOverlay.visibility = View.VISIBLE
@@ -198,7 +206,6 @@ class MainActivity : AppCompatActivity() {
                     .setDuration(350)
                     .withEndAction {
                         loadingOverlay.visibility = View.GONE
-                        codeRedButton.visibility = View.VISIBLE
                     }
                     .start()
             }
@@ -257,6 +264,47 @@ class MainActivity : AppCompatActivity() {
                     return false
                 }
                 return true
+            }
+        }
+    }
+
+    /**
+     * Watches only the top-left Nexus mark region for four quick taps. The
+     * listener returns false for ordinary touches so WebView scrolling and
+     * controls remain unchanged. AEGIS still performs the authoritative
+     * administrator check after the handoff.
+     */
+    private fun installConcealedCodeRedGesture() {
+        val density = resources.displayMetrics.density
+        val markWidth = 220f * density
+        val markHeight = 180f * density
+        val tapWindowMs = 1600L
+
+        webView.setOnTouchListener { _, event ->
+            if (event.actionMasked != MotionEvent.ACTION_UP) return@setOnTouchListener false
+
+            val inMarkZone = event.x <= markWidth && event.y <= markHeight
+            if (!inMarkZone) {
+                codeRedTapCount = 0
+                codeRedLastTapAt = 0L
+                return@setOnTouchListener false
+            }
+
+            val now = SystemClock.elapsedRealtime()
+            if (now - codeRedLastTapAt > tapWindowMs) codeRedTapCount = 0
+            codeRedLastTapAt = now
+            codeRedTapCount += 1
+
+            if (codeRedTapCount >= 4) {
+                codeRedTapCount = 0
+                codeRedLastTapAt = 0L
+                if (!codeRedHandoffInProgress) {
+                    codeRedHandoffInProgress = true
+                    openAegisCodeRed()
+                }
+                true
+            } else {
+                false
             }
         }
     }
